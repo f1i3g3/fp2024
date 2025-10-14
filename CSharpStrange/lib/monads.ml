@@ -1,14 +1,8 @@
-type tc_error =
-  | NotImplemented
-  | OccursCheck
-  | AccessError
-  | ImpossibleResult of string
-  | TypeMismatch
-  | OtherError of string
-[@@deriving show { with_path = false }]
-(* TODO!! *)
+(** Copyright 2025, Dmitrii Kuznetsov *)
 
-type error = TCError of tc_error [@@deriving show { with_path = false }]
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
+open Common
 
 module STATEERROR = struct
   type ('st, 'a) t = 'st -> 'st * ('a, error) Result.t
@@ -72,7 +66,6 @@ end
 
 module TYPECHECK = struct
   open Ast
-  open Common
   open Common.TypeCheck
   include STATEERROR
 
@@ -161,5 +154,196 @@ module TYPECHECK = struct
     read
     >>= function
     | g, l, _, t, main -> write (g, l, Some n, t, main)
+  ;;
+end
+
+module INTERPRET = struct
+  open Ast
+  open Common
+  open Common.Interpret
+
+  type ('a, 'r) runtime_signal =
+    | Pipe of 'a
+    | Return of 'r
+
+  type ('a, 'r, 'e) result =
+    | Signal of ('a, 'r) runtime_signal
+    | IError of 'e
+
+  type st = Common.Interpret.state
+  type ('a, 'r) t = st -> st * ('a, 'r, error) result
+
+  let return : 'a -> ('a, 'r) t = fun x st -> st, Signal (Pipe x)
+  let fail : 'e -> ('a, 'r) t = fun er st -> st, IError er
+  let func_return : 'r -> ('a, 'r) t = fun x st -> st, Signal (Return x)
+
+  let ( >>= ) : ('a, 'r) t -> ('a -> ('b, 'r) t) -> ('b, 'r) t =
+    fun x f st ->
+    let st, x = x st in
+    match x with
+    | Signal (Pipe x) -> f x st
+    | Signal (Return r) -> func_return r st
+    | IError er -> fail er st
+  ;;
+
+  let ( <|> ) : ('a, 'r) t -> ('a, 'r) t -> ('a, 'r) t =
+    fun x1 x2 st ->
+    let st, x = x1 st in
+    match x with
+    | Signal (Pipe x) -> return x st
+    | IError _ -> x2 st
+    | Signal (Return r) -> func_return r st
+  ;;
+
+  let ( >>| ) : ('a, 'r) t -> ('a -> 'b) -> ('b, 'r) t =
+    fun x f st ->
+    let st, x = x st in
+    match x with
+    | Signal (Pipe x) -> return (f x) st
+    | Signal (Return r) -> func_return r st
+    | IError er -> fail er st
+  ;;
+
+  let ( *> ) : ('a, 'r) t -> ('b, 'r) t -> ('b, 'r) t = fun x1 x2 -> x1 >>= fun _ -> x2
+
+  let fold_left f acc l =
+    let foo acc a = acc >>= fun acc -> f acc a >>= return in
+    List.fold_left foo (return acc) l
+  ;;
+
+  let map f list =
+    let f' acc el = acc >>= fun acc -> f el >>= fun el -> return (el :: acc) in
+    List.fold_left f' (return []) list >>| List.rev
+  ;;
+
+  let iter f list =
+    let foo acc el = acc *> f el *> return () in
+    List.fold_left foo (return ()) list
+  ;;
+
+  let lift2 f a b = a >>= fun r_a -> b >>= fun r_b -> return @@ f r_a r_b
+
+  let run : ('a, 'r) t -> st * ('a, 'r, error) result =
+    fun f -> f (IdMap.empty, (Idx 0, IdMap.empty), Adr 0, (Adr 0, AdrMap.empty))
+  ;;
+
+  let pipe_adr_with_fail (Adr a) = function
+    | Some x -> return x
+    | None -> fail (IError (AddressNotFound a))
+  ;;
+
+  let pipe_id_with_fail (Id n) = function
+    | Some x -> return x
+    | None -> fail (IError (NoVariable n))
+  ;;
+
+  let read : (st, 'r) t = fun st -> return st st
+  let write : st -> (unit, 'r) t = fun new_st _ -> new_st, Signal (Pipe ())
+
+  let read_local =
+    read
+    >>= function
+    | _, l, _, _ -> return l
+  ;;
+
+  let read_local_el f name = read_local >>= fun (_, l) -> IdMap.find_opt name l |> f
+  let read_local_el_opt name = read_local_el return name
+  let read_local_el id = read_local_el (pipe_id_with_fail id) id
+
+  let read_local_adr =
+    read
+    >>= function
+    | _, _, adr, _ -> return adr
+  ;;
+
+  let read_memory =
+    read
+    >>= function
+    | _, _, _, m -> return m
+  ;;
+
+  let read_memory_obj adr =
+    read_memory >>= fun (_, m) -> AdrMap.find_opt adr m |> pipe_adr_with_fail adr
+  ;;
+
+  let write_memory n_m =
+    read
+    >>= function
+    | g, l, adr, _ -> write (g, l, adr, n_m)
+  ;;
+
+  let write_memory_obj obj_adr obj_ctx =
+    read_memory >>= fun (adr, m) -> write_memory (adr, AdrMap.add obj_adr obj_ctx m)
+  ;;
+
+  let write_local n_l =
+    read
+    >>= function
+    | g, _, adr, m -> write (g, n_l, adr, m)
+  ;;
+
+  let write_local_el el_id el_ctx =
+    read_local >>= fun (idx, l) -> write_local (idx, IdMap.add el_id el_ctx l)
+  ;;
+
+  let write_new_local_el (Id el_id) el_ctx =
+    read_local_el_opt (Id el_id)
+    >>= function
+    | Some _ -> fail (IError (VarDeclared el_id))
+    | None -> write_local_el (Id el_id) el_ctx
+  ;;
+
+  let read_global =
+    read
+    >>= function
+    | g, _, _, _ -> return g
+  ;;
+
+  let read_global_el name =
+    read_global >>= fun g -> IdMap.find_opt name g |> pipe_id_with_fail name
+  ;;
+
+  let write_global n_g =
+    read
+    >>= function
+    | _, l, adr, m -> write (n_g, l, adr, m)
+  ;;
+
+  let write_global_el el_name el_ctx =
+    read_global >>= fun g -> write_global (IdMap.add el_name el_ctx g)
+  ;;
+
+  let find_local_el id =
+    let rec find_memory_obj adr =
+      read_memory_obj adr
+      >>= fun obj ->
+      IdMap.find_opt id obj.mems
+      |> function
+      | Some (_, vl) -> return (Value (vl, None))
+      | None ->
+        (match obj.p_adr with
+         | Some p_adr -> find_memory_obj p_adr
+         | None -> fail (IError TypeMismatch))
+    in
+    let find_global_el adr =
+      let f acc = function
+        | IMethod (m, b) when equal_ident m.m_id id ->
+          return (Some (Code (IMethod (m, b))))
+        | _ -> return acc
+      in
+      read_memory_obj adr
+      >>= fun obj ->
+      read_global_el obj.cl_name
+      >>= function
+      | IntrClass cl ->
+        fold_left f None cl.cl_body
+        >>= (function
+         | Some vl -> return vl
+         | None ->
+           (match id with
+            | Id n -> fail (IError (NoVariable n))))
+    in
+    read_local_el id
+    <|> (read_local_adr >>= fun adr -> find_memory_obj adr <|> find_global_el adr)
   ;;
 end
