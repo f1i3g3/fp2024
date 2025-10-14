@@ -300,8 +300,9 @@ let%test "Parse method 3" =
                                   , EId (Id "n")
                                   , EFuncCall
                                       ( EId (Id "Factorial")
-                                      , [ EBinOp (OpSub, EId (Id "n"), EValue (ValInt 1))
-                                        ] ) )))
+                                      , Args
+                                          [ EBinOp (OpSub, EId (Id "n"), EValue (ValInt 1))
+                                          ] ) )))
                         ]) )
              ] ))
 ;;
@@ -411,11 +412,12 @@ let%test "Parse factorial" =
                                            , EId (Id "n")
                                            , EFuncCall
                                                ( EId (Id "Factorial")
-                                               , [ EBinOp
-                                                     ( OpSub
-                                                     , EId (Id "n")
-                                                     , EValue (ValInt 1) )
-                                                 ] ) )))
+                                               , Args
+                                                   [ EBinOp
+                                                       ( OpSub
+                                                       , EId (Id "n")
+                                                       , EValue (ValInt 1) )
+                                                   ] ) )))
                                  ]) )
                       ] )
               ] )))

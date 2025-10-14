@@ -1,3 +1,7 @@
+(** Copyright 2025, Dmitrii Kuznetsov *)
+
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 open Ast
 open Monads.TYPECHECK
 open Common
@@ -80,10 +84,7 @@ let find_obj_memb_with_fail n_obj n_mem =
     (match memb with
      | Field (VarField (mds, _, _, _)) -> is_public n_obj memb mds
      | Method (Method (mds, _, _, _, _)) -> is_public n_obj memb mds
-     | _ ->
-       fail
-         (TCError
-            (ImpossibleResult "Object can only have fields and methods")))
+     | _ -> fail (TCError (ImpossibleResult "Object can only have fields and methods")))
   | None -> fail (TCError (OtherError "Class member not found"))
 ;;
 
@@ -94,7 +95,7 @@ let find_memb_type = function
   | _ -> fail (TCError TypeMismatch)
 ;;
 
-let typecheck_method_args (Params params) args expr_tc =
+let typecheck_method_args (Params params) (Args args) expr_tc =
   let params_to_list_of_type p =
     List.map
       (function
@@ -148,12 +149,41 @@ let typecheck_un_op u e expr_tc =
   tc_un_op u e >>= fun t -> return (VarType (TypeVar t))
 ;;
 
-(* TODO const *)
-(* TODO: redo funccal!!! *)
+let tc_method_args (Params params) (Args args) expr_tc =
+  let params_to_list_of_type p =
+    List.map
+      (function
+        | Var (t, _) -> vartype_to_type t)
+      p
+  in
+  let args_to_list_of_type a = map (fun x -> expr_tc x >>= fun x -> find_memb_type x) a in
+  let compare_two_lists l1 l2 eq rez =
+    match List.compare_lengths l1 l2 with
+    | 0 ->
+      (match List.equal eq l1 l2 with
+       | true -> return rez
+       | false -> fail (TCError (OtherError "Method invocation check error")))
+    | _ -> fail (TCError (OtherError "Method invocation check error"))
+  in
+  args_to_list_of_type args
+  >>= fun args -> compare_two_lists (params_to_list_of_type params) args equal__type params
+;;
+let tc_method_invoke e args expr_tc =
+  expr_tc e
+  >>= function
+  | Ast.Method (_, tp, _, pms, _) ->
+    tc_method_args pms args expr_tc
+    *>
+      (match tp with
+      | TypeBase _ -> return (VarType (TypeVar tp))
+      | TypeVoid -> fail (TCError (OtherError "Method invocation check error")))
+  | _ -> fail (TCError (OtherError "Method invocation check error"))
+;;
+
 let typecheck_expr =
   let rec tc_expr_ = function
     | EId n -> name_to_obj_ctx n
-    | EFuncCall (e, params) -> fail (TCError NotImplemented)
+    | EFuncCall (e, args) -> tc_method_invoke e args tc_expr_
     | EBinOp (b, e1, e2) -> typecheck_bin_op b e1 e2 tc_expr_
     | EUnOp (u, e) -> typecheck_un_op u e tc_expr_
     | _ -> fail (TCError NotImplemented)
@@ -299,9 +329,5 @@ let typecheck_obj cl =
     *> return ()
 ;;
 
-(* TODO: parse CSharpClass?? *)
 let typecheck prog = run (typecheck_obj prog) (IdMap.empty, IdMap.empty, None, None, None)
-
-let typecheck_main prog =
-  typecheck prog |> fun ((_, _, _, _, main), res) -> main, res
-;;
+let typecheck_main prog = typecheck prog |> fun ((_, _, _, _, main), res) -> main, res

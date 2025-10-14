@@ -175,11 +175,11 @@ let parse_id_expr = skip_spaces *> (parse_id >>| fun x -> EId x) <* skip_spaces
 let parse_call_id = parse_id_expr
 let parse_args_list arg = parens @@ sep_by (skip_spaces *> char ',') arg
 
-let parse_call_args id arg =
-  parse_args_list arg >>= fun args -> return @@ EFuncCall (id, args)
+let parse_call_args id (arg: expr t) =
+  parse_args_list arg >>= fun args -> return @@ EFuncCall (id, Args args)
 ;;
 
-let parse_call_expr arg = parse_call_id >>= fun id -> parse_call_args id arg
+let parse_call_expr (arg : expr t) = parse_call_id >>= fun id -> parse_call_args id arg
 
 (* Operations *)
 let parse_op op typ = skip_spaces *> string op *> return typ

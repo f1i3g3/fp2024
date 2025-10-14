@@ -80,7 +80,8 @@ let rec pp_expr fmt = function
   | EUnOp (op, e) -> fprintf fmt "(%a%a)" pp_un_op op pp_expr e
   | EId id -> pp_ident fmt id
   | EArrayAccess (e1, e2) -> fprintf fmt "%a[%a]" pp_expr e1 pp_expr e2
-  | EFuncCall (e, args) -> fprintf fmt "%a(%a)" pp_expr e (pp_list pp_expr ", ") args
+  | EFuncCall (e, Args args) ->
+    fprintf fmt "%a(%a)" pp_expr e (pp_list pp_expr ", ") args
   | EAwait e -> fprintf fmt "await %a" pp_expr e
 ;;
 

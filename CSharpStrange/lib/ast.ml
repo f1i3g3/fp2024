@@ -40,7 +40,6 @@ type modifier =
 
 type var_decl = Var of var_type * ident [@@deriving eq, show { with_path = false }]
 type params = Params of var_decl list [@@deriving eq, show { with_path = false }]
-(* TODO: ?? *)
 
 (** Binary operations *)
 type bin_op =
@@ -74,9 +73,11 @@ type expr =
   | EUnOp of un_op * expr (** Unary operation *)
   | EId of ident (** Identificator expression *)
   | EArrayAccess of expr * expr (** Array access: a = arr[i] *)
-  | EFuncCall of expr * expr list (** Call of function: name(arguments) *) (* TODO: args *)
+  | EFuncCall of expr * args (** Call of function: name(arguments) *) (* TODO: args *)
   | EAwait of expr (** [Await] expression *)
 [@@deriving eq, show { with_path = false }]
+
+and args = Args of expr list [@@deriving show { with_path = false }]
 
 (** Language statements *)
 type stmt =
