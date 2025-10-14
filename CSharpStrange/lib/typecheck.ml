@@ -83,8 +83,8 @@ let find_obj_memb_with_fail n_obj n_mem =
      | _ ->
        fail
          (TCError
-            (ImpossibleResult "Object can only have fields, constructors and methods")))
-  | None -> fail (TCError (OtherError "Member not found"))
+            (ImpossibleResult "Object can only have fields and methods")))
+  | None -> fail (TCError (OtherError "Class member not found"))
 ;;
 
 let find_memb_type = function
@@ -265,7 +265,7 @@ let tc_member mem =
          fail
            (TCError
               (OtherError
-                 "Main must be a static method, have no params and return only int and \
+                 "Main must be a static method, have no params and return only int or \
                   void")))
     | false -> tc_meth tp pms b
   in
@@ -301,3 +301,7 @@ let typecheck_obj cl =
 
 (* TODO: parse CSharpClass?? *)
 let typecheck prog = run (typecheck_obj prog) (IdMap.empty, IdMap.empty, None, None, None)
+
+let typecheck_main prog =
+  typecheck prog |> fun ((_, _, _, _, main), res) -> main, res
+;;
