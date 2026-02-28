@@ -166,17 +166,23 @@ let tc_method_args (Params params) (Args args) expr_tc =
     | _ -> fail (TCError (OtherError "Method invocation check error"))
   in
   args_to_list_of_type args
-  >>= fun args -> compare_two_lists (params_to_list_of_type params) args equal__type params
+  >>= fun args ->
+  compare_two_lists (params_to_list_of_type params) args equal__type params
 ;;
+
 let tc_method_invoke e args expr_tc =
   expr_tc e
   >>= function
-  | Ast.Method (_, tp, _, pms, _) ->
+  | Method (Ast.Method (_, tp, _, pms, _)) ->
     tc_method_args pms args expr_tc
-    *>
-      (match tp with
-      | TypeBase _ -> return (VarType (TypeVar tp))
-      | TypeVoid -> fail (TCError (OtherError "Method invocation check error")))
+    >>= fun _ ->
+    (match tp with
+     | TypeBase _ -> return (VarType (TypeVar tp))
+     | TypeVoid ->
+       fail (TCError (OtherError "Void methods cannot be used in expressions")))
+  | Field (Ast.VarField (_, _, _, _)) ->
+    fail (TCError (OtherError "Cannot call a field as a method"))
+  | VarType _ -> fail (TCError (OtherError "Cannot call a variable as a method"))
   | _ -> fail (TCError (OtherError "Method invocation check error"))
 ;;
 
