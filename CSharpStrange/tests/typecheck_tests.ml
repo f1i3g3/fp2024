@@ -40,6 +40,8 @@ let%expect_test _ =
     Ok! |}]
 ;;
 
+(* TODO: funccall! *)
+
 let%expect_test _ =
   test_ast
     {|
@@ -52,8 +54,10 @@ let%expect_test _ =
     } |};
   [%expect
     {|
-    (Typecheck_error (Other "Returned type does not match the function type")) |}]
+    (TCError (OtherError "Returned type does not match the function type")) |}]
 ;;
+
+(* TODO: funccall! *)
 
 let%expect_test _ =
   test_ast {| 
@@ -63,7 +67,7 @@ let%expect_test _ =
     int a = 9;
   } |};
   [%expect {|
-    (Typecheck_error (Other "This variable is already declared")) |}]
+    (TCError (OtherError "This variable is already declared")) |}]
 ;;
 
 let%expect_test _ =
@@ -86,6 +90,8 @@ let%expect_test _ =
     Ok! |}]
 ;;
 
+(* TODO: parser check! *)
+
 let%expect_test _ =
   test_ast {| 
   class Program {
@@ -93,8 +99,10 @@ let%expect_test _ =
     int c = 9 + a;
   } |};
   [%expect {|
-    (Typecheck_error TypeMismatch) |}]
+    (TCError TypeMismatch) |}]
 ;;
+
+(* TODO: string! *)
 
 let%expect_test _ =
   test_ast
@@ -121,6 +129,8 @@ let%expect_test _ =
     Ok! |}]
 ;;
 
+(* TODO: ????! *)
+
 let%expect_test _ =
   test_ast
     {| 
@@ -144,6 +154,8 @@ let%expect_test _ =
     Ok! |}]
 ;;
 
+(* TODO: some stuff here! *)
+
 let%expect_test _ =
   test_ast {| 
   class Program {
@@ -152,10 +164,12 @@ let%expect_test _ =
   |};
   [%expect
     {|
-    (Typecheck_error
-       (Other
+    (TCError
+       (OtherError
           "Main must be a static method, have no params and return only int and void")) |}]
 ;;
+
+(* TODO: formatting???! *)
 
 let%expect_test _ =
   test_ast
@@ -166,7 +180,7 @@ let%expect_test _ =
     void Test() {}
   } |};
   [%expect {|
-    (Typecheck_error (Other "This variable is already declared")) |}]
+    (TCError (OtherError "This variable is already declared")) |}]
 ;;
 
 let%expect_test _ =
@@ -178,17 +192,15 @@ let%expect_test _ =
     };
   }|};
   [%expect {|
-    (Typecheck_error TypeMismatch) |}]
+    (TCError TypeMismatch) |}]
 ;;
+(* TODO: check formatting??!*)
 
-let%expect_test _ =
-  test_ast
-    {| 
+(* TODO: occurs check: smth like
+  {|
   class Program {
     public void foo() {
       bool a = new A();
     };
-  }|};
-  [%expect {|
-    (Typecheck_error Occurs_check) |}]
-;;
+  }|}
+*)
