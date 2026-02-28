@@ -7,7 +7,7 @@ open Parser
 open Typecheck
 open Common
 open Common.Interpret
-open Monads.INTERPRT
+open Monads.INTERPRET
 
 let is_val = function
   | Value (x, _) -> return x
