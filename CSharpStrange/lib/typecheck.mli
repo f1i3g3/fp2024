@@ -7,4 +7,4 @@ open Monads.TYPECHECK
 open Common
 
 val typecheck : c_sharp_class -> TypeCheck.state * (unit, error) result
-val type_checker_with_main : c_sharp_class -> Ast.ident option * (unit, Common.error) result
+val typecheck_main : c_sharp_class -> Ast.ident option * (unit, Common.error) result
